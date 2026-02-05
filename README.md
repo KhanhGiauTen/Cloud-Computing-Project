@@ -54,7 +54,14 @@ CloudContactManager/
 
 ## Configuration
 
-### appsettings.json
+### ⚠️ Security Warning
+
+**NEVER commit actual AWS credentials or database passwords to source control!** The `appsettings.json` file in this repository contains placeholder values only. For production deployments:
+- Use environment variables
+- Use AWS IAM roles (recommended when deployed on AWS)
+- Use AWS Secrets Manager or Parameter Store
+
+### appsettings.json (Development Template)
 
 ```json
 {
@@ -63,8 +70,8 @@ CloudContactManager/
   },
   "AWS": {
     "Region": "us-east-1",
-    "AccessKey": "YOUR_AWS_ACCESS_KEY",
-    "SecretKey": "YOUR_AWS_SECRET_KEY",
+    "AccessKey": "",
+    "SecretKey": "",
     "SenderEmail": "verified-email@yourdomain.com"
   }
 }
@@ -79,6 +86,8 @@ export AWS__AccessKey="your-access-key"
 export AWS__SecretKey="your-secret-key"
 export AWS__SenderEmail="noreply@yourdomain.com"
 ```
+
+**Note:** When deploying to AWS EC2 or ECS, consider using IAM roles instead of access keys for better security.
 
 ## Getting Started
 
