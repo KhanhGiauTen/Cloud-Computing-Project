@@ -7,16 +7,18 @@ namespace CloudContactManager.Controllers
 {
     /// <summary>
     /// Controller for Customer CRUD operations.
+    /// NOTE: INotificationService dependency is commented out until implementation is registered in Program.cs
     /// </summary>
     public class CustomersController : Controller
     {
         private readonly AppDbContext _context;
-        private readonly INotificationService _notificationService;
+        // TODO: Uncomment when INotificationService implementation is registered
+        // private readonly INotificationService _notificationService;
 
-        public CustomersController(AppDbContext context, INotificationService notificationService)
+        public CustomersController(AppDbContext context /*, INotificationService notificationService*/)
         {
             _context = context;
-            _notificationService = notificationService;
+            // _notificationService = notificationService;
         }
 
         // GET: Customers
@@ -39,6 +41,7 @@ namespace CloudContactManager.Controllers
         public IActionResult Create(Customer customer)
         {
             // TODO: Validate and save new customer to database
+            // TODO: Call _notificationService.SendEmailAsync() to send welcome email
             return View(customer);
         }
 

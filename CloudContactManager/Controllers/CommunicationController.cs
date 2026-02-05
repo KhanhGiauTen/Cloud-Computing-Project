@@ -7,16 +7,18 @@ namespace CloudContactManager.Controllers
 {
     /// <summary>
     /// Controller for bulk communication operations (SMS/Email to multiple customers).
+    /// NOTE: INotificationService dependency is commented out until implementation is registered in Program.cs
     /// </summary>
     public class CommunicationController : Controller
     {
         private readonly AppDbContext _context;
-        private readonly INotificationService _notificationService;
+        // TODO: Uncomment when INotificationService implementation is registered
+        // private readonly INotificationService _notificationService;
 
-        public CommunicationController(AppDbContext context, INotificationService notificationService)
+        public CommunicationController(AppDbContext context /*, INotificationService notificationService*/)
         {
             _context = context;
-            _notificationService = notificationService;
+            // _notificationService = notificationService;
         }
 
         // GET: Communication
