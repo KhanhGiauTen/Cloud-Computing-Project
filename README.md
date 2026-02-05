@@ -1,139 +1,118 @@
-# CloudContactManager - Cloud Computing Final Project
+# CloudContactManager - Project Scaffolding
 
-A SaaS Customer Management System built with ASP.NET Core 8.0 MVC, featuring AWS integration for email and SMS notifications.
+A SaaS application skeleton for customer contact management built with ASP.NET Core 8.0 MVC.
 
 ## Tech Stack
 
 - **Framework:** ASP.NET Core 8.0 MVC (C#)
-- **Database:** SQL Server (Amazon RDS compatible)
-- **Cloud Services:** 
-  - AWS SES (Simple Email Service) - Email notifications
-  - AWS SNS (Simple Notification Service) - SMS notifications
+- **ORM:** Entity Framework Core
+- **Database:** SQL Server
+- **Cloud SDK:** AWS SDK (SES/SNS for notifications)
 
 ## Project Structure
 
 ```
 CloudContactManager/
 ├── Controllers/
-│   └── CustomersController.cs    # CRUD operations for customers
+│   ├── HomeController.cs
+│   ├── CustomersController.cs      # Customer CRUD operations
+│   └── CommunicationController.cs  # Bulk SMS/Email operations
 ├── Data/
-│   └── ApplicationDbContext.cs   # Entity Framework Core DbContext
+│   └── AppDbContext.cs             # EF Core DbContext
 ├── Models/
-│   └── Customer.cs               # Customer entity with data annotations
+│   └── Customer.cs                 # Customer entity (Id, FullName, Address, PhoneNumber, EmailAddress)
+├── ViewModels/
+│   └── CommunicationRequest.cs     # ViewModel for bulk communication
 ├── Services/
-│   ├── INotificationService.cs   # Interface for notification services
-│   └── AwsNotificationService.cs # AWS SES & SNS implementation
+│   └── Interfaces/
+│       └── INotificationService.cs # Notification service interface
 ├── Views/
-│   └── Customers/                # Customer CRUD views
-│       ├── Index.cshtml
-│       ├── Create.cshtml
-│       ├── Edit.cshtml
-│       ├── Details.cshtml
-│       └── Delete.cshtml
-├── appsettings.json              # Configuration (AWS, ConnectionStrings)
-└── Program.cs                    # Application entry point & DI configuration
+│   ├── Customers/
+│   ├── Communication/
+│   ├── Home/
+│   └── Shared/
+├── wwwroot/
+├── appsettings.json
+└── Program.cs
 ```
 
-## Features
+## Components
 
-1. **Customer Management (CRUD)**
-   - Create new customers with validation
-   - View customer list and details
-   - Edit customer information
-   - Delete customers
+### Models
 
-2. **AWS Integration**
-   - Welcome email sent automatically when creating a new customer (AWS SES)
-   - Send SMS to customers from the details page (AWS SNS)
-   - Graceful error handling for AWS Sandbox limitations
+- **Customer.cs**: Entity with properties matching assignment:
+  - `Id` (int)
+  - `FullName` (string)
+  - `Address` (string?)
+  - `PhoneNumber` (string)
+  - `EmailAddress` (string)
 
-3. **Security**
-   - No hardcoded AWS credentials
-   - Configuration via `appsettings.json` or Environment Variables
-   - Anti-forgery token validation on forms
+### ViewModels
+
+- **CommunicationRequest.cs**: ViewModel for bulk communication:
+  - `CustomerIds` (List<int>) - Selected customer IDs
+  - `MessageContent` (string) - Message to send
+  - `Type` (string) - "SMS" or "Email"
+
+### Data Layer
+
+- **AppDbContext.cs**: Entity Framework Core DbContext with `DbSet<Customer>`
+
+### Services
+
+- **INotificationService.cs**: Interface defining:
+  - `SendEmailAsync(string toEmail, string subject, string body)`
+  - `SendSmsAsync(string phoneNumber, string message)`
+  - `SendBulkAsync(List<string> recipients, string message, string type)`
+
+### Controllers
+
+- **CustomersController.cs**: Standard CRUD (Index, Create, Edit, Delete)
+- **CommunicationController.cs**: Bulk communication (Index with checkboxes, Send action)
 
 ## Configuration
 
-### ⚠️ Security Warning
-
-**NEVER commit actual AWS credentials or database passwords to source control!** The `appsettings.json` file in this repository contains placeholder values only. For production deployments:
-- Use environment variables
-- Use AWS IAM roles (recommended when deployed on AWS)
-- Use AWS Secrets Manager or Parameter Store
-
-### appsettings.json (Development Template)
+### appsettings.json
 
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=your-rds-endpoint.region.rds.amazonaws.com;Database=CloudContactManager;User Id=your-username;Password=your-password;TrustServerCertificate=True;"
+    "DefaultConnection": "Server=your-server;Database=CloudContactManager;..."
   },
   "AWS": {
-    "Region": "us-east-1",
-    "AccessKey": "",
-    "SecretKey": "",
-    "SenderEmail": "verified-email@yourdomain.com"
+    "Profile": "default",
+    "Region": "us-east-1"
   }
 }
 ```
 
-### Environment Variables (Recommended for Production)
+### AWS Authentication
 
-```bash
-export ConnectionStrings__DefaultConnection="your-connection-string"
-export AWS__Region="us-east-1"
-export AWS__AccessKey="your-access-key"
-export AWS__SecretKey="your-secret-key"
-export AWS__SenderEmail="noreply@yourdomain.com"
-```
+The project uses `AWSSDK.Extensions.NETCore.Setup` which supports:
 
-**Note:** When deploying to AWS EC2 or ECS, consider using IAM roles instead of access keys for better security.
+1. **Local Development**: Uses AWS CLI profile from `~/.aws/credentials`
+2. **EC2 Deployment**: Automatically uses IAM Instance Profile (no config needed)
+
+See `Program.cs` for detailed comments on credential resolution.
 
 ## Getting Started
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/KhanhGiauTen/Cloud-Computing-Final-Project.git
-   cd Cloud-Computing-Final-Project/CloudContactManager
-   ```
+1. Clone the repository
+2. Update `appsettings.json` with your configuration
+3. Implement `INotificationService` using AWS SDK
+4. Register the implementation in `Program.cs`
+5. Run migrations: `dotnet ef migrations add InitialCreate`
+6. Update database: `dotnet ef database update`
+7. Run the application: `dotnet run`
 
-2. **Update Configuration**
-   - Update `appsettings.json` with your AWS credentials and RDS connection string
-   - Or set environment variables
+## TODO
 
-3. **Apply Database Migrations**
-   ```bash
-   dotnet ef migrations add InitialCreate
-   dotnet ef database update
-   ```
-
-4. **Run the Application**
-   ```bash
-   dotnet run
-   ```
-
-5. **Access the Application**
-   - Navigate to `https://localhost:5001` or `http://localhost:5000`
-   - Click on "Customers" in the navigation menu
-
-## AWS Setup Notes
-
-### AWS SES (Simple Email Service)
-- In Sandbox mode, both sender and recipient emails must be verified
-- Move to production mode to send emails to any address
-- Configure sender email in `appsettings.json` under `AWS:SenderEmail`
-
-### AWS SNS (Simple Notification Service)
-- Phone numbers should be in E.164 format (e.g., +1234567890)
-- In Sandbox mode, you may need to verify phone numbers
-- SMS type is set to "Transactional" for reliable delivery
-
-## Dependencies
-
-- Microsoft.EntityFrameworkCore.SqlServer (8.0.0)
-- Microsoft.EntityFrameworkCore.Tools (8.0.0)
-- AWSSDK.SimpleEmail
-- AWSSDK.SimpleNotificationService
+- [ ] Implement `INotificationService` using AWS SES/SNS
+- [ ] Add data validation attributes to Customer model
+- [ ] Create Customer views (Index, Create, Edit, Delete)
+- [ ] Implement CRUD business logic in CustomersController
+- [ ] Implement bulk communication logic in CommunicationController
+- [ ] Add authentication and authorization
 
 ## License
 
