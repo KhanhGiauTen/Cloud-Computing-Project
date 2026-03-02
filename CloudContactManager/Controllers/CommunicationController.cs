@@ -2,6 +2,7 @@ using CloudContactManager.Data;
 using CloudContactManager.Services.Interfaces;
 using CloudContactManager.ViewModels;
 using Microsoft.AspNetCore.Mvc;
+using System;
 
 namespace CloudContactManager.Controllers
 {
@@ -11,9 +12,8 @@ namespace CloudContactManager.Controllers
     /// </summary>
     public class CommunicationController : Controller
     {
+        private readonly INotificationService _notificationService;
         private readonly AppDbContext _context;
-        // TODO: Uncomment when INotificationService implementation is registered
-        // private readonly INotificationService _notificationService;
 
         public CommunicationController(AppDbContext context /*, INotificationService notificationService*/)
         {
@@ -25,8 +25,7 @@ namespace CloudContactManager.Controllers
         // Displays list of customers with checkboxes to select multiple people
         public IActionResult Index()
         {
-            // TODO: Retrieve all customers from database
-            // TODO: Return view with customer list for selection
+            var customers = _context.Customers.OrderBy(c => c.FullName).ToList();
             return View();
         }
 
@@ -36,11 +35,29 @@ namespace CloudContactManager.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Send(CommunicationRequest request)
         {
-            // TODO: Validate request
-            // TODO: Retrieve selected customers from database using request.CustomerIds
-            // TODO: Extract recipient addresses (email or phone) based on request.Type
-            // TODO: Call _notificationService.SendBulkAsync(recipients, request.MessageContent, request.Type)
-            // TODO: Return result to user
+            // 1 valid request
+            if (request.CustomerIds == null || !request.CustomerIds.Any())
+            {
+                ModelState.AddModelError("", "Please select at least one customer.");
+                return View("Index", _context.Customers.ToList());
+            }
+
+            // 2. Get email or Phone number
+            var recipients = _context.Customers
+                .Where(c => request.CustomerIds.Contains(c.Id))
+                .Select(c => request.Type == "SMS" ? c.PhoneNumber : c.EmailAddress)
+                .ToList();
+
+            // 3. bulk shipping service
+            try
+            {
+                await _notificationService.SendBulkAsync(recipients, request.MessageContent, request.Type);
+                TempData["Success"] = $"Sent {request.Type} successfully to {recipients.Count} receiver.";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = "An error occurred while sending the notification.: " + ex.Message;
+            }
 
             return RedirectToAction(nameof(Index));
         }
