@@ -12,6 +12,7 @@ namespace CloudContactManager.Controllers
     /// </summary>
     public class CommunicationController : Controller
     {
+        private readonly INotificationService _notificationService;
         private readonly AppDbContext _context;
         // TODO: Uncomment when INotificationService implementation is registered
         private readonly INotificationService _notificationService;
@@ -26,8 +27,7 @@ namespace CloudContactManager.Controllers
         // Displays list of customers with checkboxes to select multiple people
         public IActionResult Index()
         {
-            // TODO: Retrieve all customers from database
-            // TODO: Return view with customer list for selection
+            var customers = _context.Customers.OrderBy(c => c.FullName).ToList();
             return View();
         }
 
