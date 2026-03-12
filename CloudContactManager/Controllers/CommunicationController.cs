@@ -8,7 +8,6 @@ namespace CloudContactManager.Controllers
 {
     /// <summary>
     /// Controller for bulk communication operations (SMS/Email to multiple customers).
-    /// NOTE: INotificationService dependency is commented out until implementation is registered in Program.cs
     /// </summary>
     public class CommunicationController : Controller
     {
@@ -28,7 +27,7 @@ namespace CloudContactManager.Controllers
         public IActionResult Index()
         {
             var customers = _context.Customers.OrderBy(c => c.FullName).ToList();
-            return View();
+            return View(customers);
         }
 
         // POST: Communication/Send
