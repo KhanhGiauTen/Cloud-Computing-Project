@@ -8,18 +8,16 @@ namespace CloudContactManager.Controllers
 {
     /// <summary>
     /// Controller for Customer CRUD operations.
-    /// NOTE: INotificationService dependency is commented out until implementation is registered in Program.cs
     /// </summary>
     public class CustomersController : Controller
     {
         private readonly AppDbContext _context;
-        // TODO: Uncomment when INotificationService implementation is registered
-        // private readonly INotificationService _notificationService;
+        private readonly INotificationService _notificationService;
 
-        public CustomersController(AppDbContext context /*, INotificationService notificationService*/)
+        public CustomersController(AppDbContext context, INotificationService notificationService)
         {
             _context = context;
-            // _notificationService = notificationService;
+            _notificationService = notificationService;
         }
 
         // GET: Customers
@@ -99,12 +97,12 @@ namespace CloudContactManager.Controllers
         // GET: Customers/Delete/5
         public async Task<IActionResult> Delete(int? id)
         {
-            // TODO: Retrieve customer by id and return delete confirmation view
             if (id == null) return NotFound();
 
             var customer = await _context.Customers.FirstOrDefaultAsync(m => m.Id == id);
             if (customer == null) return NotFound();
-            return View();
+
+            return View(customer);
         }
 
         // POST: Customers/Delete/5

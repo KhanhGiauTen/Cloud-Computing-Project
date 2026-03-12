@@ -1,4 +1,5 @@
 using CloudContactManager.Data;
+using CloudContactManager.Services;
 using CloudContactManager.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,35 +13,40 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // ============================================================================
-// AWS SDK Configuration using AWSSDK.Extensions.NETCore.Setup
+// Notification Service Registration
 // ============================================================================
-// This configuration supports both local development and EC2 deployment:
-//
-// LOCAL DEVELOPMENT (appsettings.json):
-// - Uses the "AWS" section in appsettings.json
-// - Configure "Profile" to use a named profile from ~/.aws/credentials
-// - Or configure "AccessKey" and "SecretKey" directly (not recommended)
-//
-// EC2 DEPLOYMENT (IAM Instance Profile):
-// - When deployed to EC2 with an IAM Role attached, the SDK automatically
-//   detects and uses the instance profile credentials
-// - No additional configuration needed - just remove or leave empty the
-//   "Profile", "AccessKey", and "SecretKey" settings
-// - The SDK's credential chain will automatically find IAM role credentials
-//
-// Credential Resolution Order:
-// 1. Explicit credentials in code (not used here)
-// 2. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
-// 3. AWS credentials file (~/.aws/credentials) with profile
-// 4. EC2 Instance Profile / IAM Role (automatic on EC2)
+// LOCAL  → LocalNotificationService  (no AWS needed, logs to console)
+// AWS    → AwsNotificationService    (requires AWS credentials)
+// Switch by checking if AWS credentials are available
 // ============================================================================
 
-builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
+var awsProfile = builder.Configuration.GetSection("AWS")["Profile"];
+var hasAwsEnvVars = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID"));
+var hasAwsProfile = false;
 
-// TODO: Register INotificationService implementation
-// builder.Services.AddScoped<INotificationService, AwsNotificationService>();
-// builder.Services.AddAWSService<IAmazonSimpleEmailService>();
-// builder.Services.AddAWSService<IAmazonSimpleNotificationService>();
+if (!string.IsNullOrEmpty(awsProfile))
+{
+    var credFile = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".aws", "credentials");
+    hasAwsProfile = File.Exists(credFile);
+}
+
+if (hasAwsEnvVars || hasAwsProfile)
+{
+    // AWS credentials found → use real AWS services
+    builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
+    builder.Services.AddAWSService<Amazon.SimpleNotificationService.IAmazonSimpleNotificationService>();
+    builder.Services.AddAWSService<Amazon.SimpleEmail.IAmazonSimpleEmailService>();
+    builder.Services.AddScoped<INotificationService, AwsNotificationService>();
+    Console.WriteLine("✅ Using AWS Notification Service (SES/SNS)");
+}
+else
+{
+    // No AWS credentials → use local simulation
+    builder.Services.AddScoped<INotificationService, LocalNotificationService>();
+    Console.WriteLine("✅ Using Local Notification Service (console simulation)");
+}
 
 var app = builder.Build();
 
