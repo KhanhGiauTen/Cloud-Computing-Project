@@ -1,3 +1,6 @@
+using Amazon.SimpleEmail;
+using Amazon.SimpleEmail.Model;
+
 namespace CloudContactManager.Services.Interfaces
 {
     /// <summary>

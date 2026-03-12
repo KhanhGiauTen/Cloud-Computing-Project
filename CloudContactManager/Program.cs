@@ -2,11 +2,18 @@ using CloudContactManager.Data;
 using CloudContactManager.Services;
 using CloudContactManager.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Amazon.SimpleEmail;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+
+// Add to assign AWS SES
+builder.Services.AddAWSService<IAmazonSimpleEmailService>();
+
+// Assign your EmailService
+builder.Services.AddScoped<INotificationService, EmailNotificationService>();
 
 // Configure Entity Framework Core with SQL Server
 builder.Services.AddDbContext<AppDbContext>(options =>
