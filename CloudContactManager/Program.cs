@@ -16,8 +16,9 @@ builder.Services.AddAWSService<IAmazonSimpleEmailService>();
 builder.Services.AddScoped<INotificationService, EmailNotificationService>();
 
 // Configure Entity Framework Core with SQL Server
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
 // ============================================================================
 // Notification Service Registration
@@ -46,13 +47,13 @@ if (hasAwsEnvVars || hasAwsProfile)
     builder.Services.AddAWSService<Amazon.SimpleNotificationService.IAmazonSimpleNotificationService>();
     builder.Services.AddAWSService<Amazon.SimpleEmail.IAmazonSimpleEmailService>();
     builder.Services.AddScoped<INotificationService, AwsNotificationService>();
-    Console.WriteLine("✅ Using AWS Notification Service (SES/SNS)");
+    Console.WriteLine("Using AWS Notification Service (SES/SNS)");
 }
 else
 {
     // No AWS credentials → use local simulation
     builder.Services.AddScoped<INotificationService, LocalNotificationService>();
-    Console.WriteLine("✅ Using Local Notification Service (console simulation)");
+    Console.WriteLine("Using Local Notification Service (console simulation)");
 }
 
 var app = builder.Build();
@@ -76,3 +77,4 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
+
