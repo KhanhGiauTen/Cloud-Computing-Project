@@ -3,22 +3,28 @@ using CloudContactManager.Services;
 using CloudContactManager.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Amazon.SimpleEmail;
+using Amazon.SimpleNotificationService;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
-// Add to assign AWS SES
-builder.Services.AddAWSService<IAmazonSimpleEmailService>();
+var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is missing.");
+var dbProvider = builder.Configuration["DatabaseProvider"] ?? "SqlServer";
 
-// Assign your EmailService
-builder.Services.AddScoped<INotificationService, EmailNotificationService>();
-
-// Configure Entity Framework Core with SQL Server
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+{
+    if (dbProvider.Equals("MySql", StringComparison.OrdinalIgnoreCase))
+    {
+        options.UseMySql(defaultConnection, ServerVersion.AutoDetect(defaultConnection));
+    }
+    else
+    {
+        options.UseSqlServer(defaultConnection);
+    }
+});
 
 // ============================================================================
 // Notification Service Registration
@@ -28,33 +34,33 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Switch by checking if AWS credentials are available
 // ============================================================================
 
-// var awsProfile = builder.Configuration.GetSection("AWS")["Profile"];
-// var hasAwsEnvVars = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID"));
-// var hasAwsProfile = false;
+var awsProfile = builder.Configuration.GetSection("AWS")["Profile"];
+var hasAwsEnvVars = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID"));
+var hasAwsProfile = false;
 
-// if (!string.IsNullOrEmpty(awsProfile))
-// {
-//     var credFile = Path.Combine(
-//         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-//         ".aws", "credentials");
-//     hasAwsProfile = File.Exists(credFile);
-// }
+if (!string.IsNullOrEmpty(awsProfile))
+{
+    var credFile = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".aws", "credentials");
+    hasAwsProfile = File.Exists(credFile);
+}
 
-// if (hasAwsEnvVars || hasAwsProfile)
-// {
-//     // AWS credentials found → use real AWS services
-//     builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
-//     builder.Services.AddAWSService<Amazon.SimpleNotificationService.IAmazonSimpleNotificationService>();
-//     builder.Services.AddAWSService<Amazon.SimpleEmail.IAmazonSimpleEmailService>();
-//     builder.Services.AddScoped<INotificationService, AwsNotificationService>();
-//     Console.WriteLine("Using AWS Notification Service (SES/SNS)");
-// }
-// else
-// {
-//     // No AWS credentials → use local simulation
-//     builder.Services.AddScoped<INotificationService, LocalNotificationService>();
-//     Console.WriteLine("Using Local Notification Service (console simulation)");
-// }
+if (hasAwsEnvVars || hasAwsProfile)
+{
+    // AWS credentials found → use real AWS services
+    builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
+    builder.Services.AddAWSService<IAmazonSimpleNotificationService>();
+    builder.Services.AddAWSService<IAmazonSimpleEmailService>();
+    builder.Services.AddScoped<INotificationService, AwsNotificationService>();
+    Console.WriteLine("✅ Using AWS Notification Service (SES/SNS)");
+}
+else
+{
+    // No AWS credentials → use local simulation
+    builder.Services.AddScoped<INotificationService, LocalNotificationService>();
+    Console.WriteLine("✅ Using Local Notification Service (console simulation)");
+}
 
 var app = builder.Build();
 
