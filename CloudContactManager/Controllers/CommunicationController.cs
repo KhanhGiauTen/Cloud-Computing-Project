@@ -13,8 +13,6 @@ namespace CloudContactManager.Controllers
     {
         private readonly INotificationService _notificationService;
         private readonly AppDbContext _context;
-        // TODO: Uncomment when INotificationService implementation is registered
-        private readonly INotificationService _notificationService;
 
         public CommunicationController(AppDbContext context, INotificationService notificationService)
         {
@@ -58,7 +56,7 @@ namespace CloudContactManager.Controllers
                 //List of receivers (Email or SMS)
                 List<string> recipients = new List<string>();
 
-                if (request.Type == "email")
+                if (request.Type.Equals("Email", StringComparison.OrdinalIgnoreCase))
                 {
                     // Take EmailAddress column
                     recipients = selectedCustomers
@@ -74,12 +72,12 @@ namespace CloudContactManager.Controllers
                 // Call bulk sending service
                 if (recipients.Any())
                 {
-                    // await _notificationService.SendBulkAsync(recipients, request.MessageContent, request.Type);
-                    // TempData["Success"] = $"Sent for {recipients.Count} people.";
+                    await _notificationService.SendBulkAsync(recipients, request.MessageContent, request.Type);
+                    TempData["Success"] = $"Sent successfully to {recipients.Count} recipients.";
                 }
                 else
                 {
-                    TempData["Warning"] = "No valid email address found in the list.";
+                    TempData["Warning"] = "No valid recipients found in the selected list.";
                 }
             }
             catch (Exception ex)
@@ -89,6 +87,52 @@ namespace CloudContactManager.Controllers
             }
 
             return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost("api/communication/send")]
+        public async Task<IActionResult> SendApi([FromBody] CommunicationRequest request)
+        {
+            if (request.CustomerIds == null || !request.CustomerIds.Any())
+            {
+                return BadRequest(new { Message = "Please choose at least one customer." });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.MessageContent))
+            {
+                return BadRequest(new { Message = "Message content can not be blank." });
+            }
+
+            var selectedCustomers = await _context.Customers
+                .Where(c => request.CustomerIds.Contains(c.Id))
+                .ToListAsync();
+
+            List<string> recipients;
+            if (request.Type.Equals("Email", StringComparison.OrdinalIgnoreCase))
+            {
+                recipients = selectedCustomers
+                    .Where(c => !string.IsNullOrWhiteSpace(c.EmailAddress))
+                    .Select(c => c.EmailAddress)
+                    .ToList();
+            }
+            else if (request.Type.Equals("SMS", StringComparison.OrdinalIgnoreCase))
+            {
+                recipients = selectedCustomers
+                    .Where(c => !string.IsNullOrWhiteSpace(c.PhoneNumber))
+                    .Select(c => c.PhoneNumber)
+                    .ToList();
+            }
+            else
+            {
+                return BadRequest(new { Message = "Invalid communication type. Use Email or SMS." });
+            }
+
+            if (!recipients.Any())
+            {
+                return NotFound(new { Message = "No valid recipients found in the selected list." });
+            }
+
+            await _notificationService.SendBulkAsync(recipients, request.MessageContent, request.Type);
+            return Ok(new { Message = $"Sent successfully to {recipients.Count} recipients." });
         }
     }
 }
