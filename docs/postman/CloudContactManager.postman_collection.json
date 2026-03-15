@@ -1,0 +1,117 @@
+{
+  "info": {
+    "_postman_id": "7f3ee15f-d335-4e65-9dd8-6e13b5fc9f2a",
+    "name": "CloudContactManager Communication API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Communication Page",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/Communication",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "Communication"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Send Communication (MVC Form)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "CustomerIds",
+              "value": "1",
+              "type": "text"
+            },
+            {
+              "key": "CustomerIds",
+              "value": "2",
+              "type": "text"
+            },
+            {
+              "key": "MessageContent",
+              "value": "Xin chao tu CloudContactManager",
+              "type": "text"
+            },
+            {
+              "key": "Type",
+              "value": "Email",
+              "type": "text"
+            },
+            {
+              "key": "__RequestVerificationToken",
+              "value": "{{antiForgeryToken}}",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/Communication/Send",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "Communication",
+            "Send"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Send Communication (API JSON)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customerIds\": [1, 2],\n  \"messageContent\": \"Hello from API test\",\n  \"type\": \"Email\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/communication/send",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "communication",
+            "send"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://localhost:5001"
+    },
+    {
+      "key": "antiForgeryToken",
+      "value": ""
+    }
+  ]
+}
