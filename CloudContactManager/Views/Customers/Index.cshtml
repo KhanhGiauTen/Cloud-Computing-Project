@@ -36,9 +36,6 @@
                             <th>
                                 @Html.DisplayNameFor(model => model.Address)
                             </th>
-                            <th>
-                                @Html.DisplayNameFor(model => model.CreatedAt)
-                            </th>
                             <th class="text-center">Thao tác</th>
                         </tr>
                     </thead>
@@ -57,9 +54,6 @@
                                 </td>
                                 <td>
                                     @Html.DisplayFor(modelItem => item.Address)
-                                </td>
-                                <td>
-                                    @item.CreatedAt.ToString("dd/MM/yyyy HH:mm")
                                 </td>
                                 <td class="text-center">
                                     <div class="btn-group" role="group">

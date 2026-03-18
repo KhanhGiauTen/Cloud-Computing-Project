@@ -1,7 +1,10 @@
 using CloudContactManager.Data;
+using CloudContactManager.Models;
 using CloudContactManager.Services;
+using CloudContactManager.Services.API;
 using CloudContactManager.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 using Amazon.SimpleEmail;
 using Amazon.SimpleNotificationService;
 
@@ -9,10 +12,55 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ITenantProvider, HttpContextTenantProvider>();
+builder.Services.AddSingleton<IPasswordHasher<Tenant>, PasswordHasher<Tenant>>();
+builder.Services.AddHttpClient<Speedsmsapi>();
+builder.Services.AddScoped<NotificationServices>();
 
 var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is missing.");
 var dbProvider = builder.Configuration["DatabaseProvider"] ?? "SqlServer";
+
+string NormalizeSqlServerConnectionString(string connectionString)
+{
+    var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var part in connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries))
+    {
+        var index = part.IndexOf('=');
+        if (index <= 0)
+        {
+            continue;
+        }
+
+        var key = part[..index].Trim();
+        var value = part[(index + 1)..].Trim();
+        values[key] = value;
+    }
+
+    if (!values.ContainsKey("Server") && values.TryGetValue("Host", out var host))
+    {
+        values["Server"] = host;
+        values.Remove("Host");
+    }
+
+    if (values.TryGetValue("Port", out var port) && values.TryGetValue("Server", out var server))
+    {
+        if (!server.Contains(','))
+        {
+            values["Server"] = $"{server},{port}";
+        }
+        values.Remove("Port");
+    }
+
+    if (values.TryGetValue("User", out var user) && !values.ContainsKey("User Id"))
+    {
+        values["User Id"] = user;
+        values.Remove("User");
+    }
+
+    return string.Join(';', values.Select(kvp => $"{kvp.Key}={kvp.Value}")) + ';';
+}
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
@@ -22,7 +70,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     }
     else
     {
-        options.UseSqlServer(defaultConnection);
+        var sqlServerConnection = NormalizeSqlServerConnectionString(defaultConnection);
+        options.UseSqlServer(sqlServerConnection);
     }
 });
 

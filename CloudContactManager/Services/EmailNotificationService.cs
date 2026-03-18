@@ -1,5 +1,6 @@
 ﻿using Amazon.SimpleEmail;
 using Amazon.SimpleEmail.Model;
+using Amazon.Runtime;
 using CloudContactManager.Services.Interfaces;
 
 namespace CloudContactManager.Services
@@ -52,6 +53,24 @@ namespace CloudContactManager.Services
             catch (Exception ex)
             {
                 throw new Exception($"Unknow Error: {ex.Message}");
+            }
+        }
+
+        public Task SendSmsAsync(string phoneNumber, string message)
+        {
+            throw new NotSupportedException("EmailNotificationService does not support SMS.");
+        }
+
+        public async Task SendBulkAsync(List<string> recipients, string message, string type)
+        {
+            if (!type.Equals("Email", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new NotSupportedException("EmailNotificationService only supports Email type.");
+            }
+
+            foreach (var recipient in recipients)
+            {
+                await SendEmailAsync(recipient, "Cloud Contact Notification", message);
             }
         }
     }

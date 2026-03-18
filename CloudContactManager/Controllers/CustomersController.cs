@@ -12,12 +12,12 @@ namespace CloudContactManager.Controllers
     public class CustomersController : Controller
     {
         private readonly AppDbContext _context;
-        private readonly INotificationService _notificationService;
+        private readonly ITenantProvider _tenantProvider;
 
-        public CustomersController(AppDbContext context, INotificationService notificationService)
+        public CustomersController(AppDbContext context, ITenantProvider tenantProvider)
         {
             _context = context;
-            _notificationService = notificationService;
+            _tenantProvider = tenantProvider;
         }
 
         // GET: Customers
@@ -44,6 +44,7 @@ namespace CloudContactManager.Controllers
             // TODO: Call _notificationService.SendEmailAsync() to send welcome email
             if (ModelState.IsValid)
             {
+                customer.TenantId = _tenantProvider.GetTenantId();
                 _context.Add(customer) ;
                 await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
@@ -70,6 +71,8 @@ namespace CloudContactManager.Controllers
         {
             // TODO: Validate and update customer in database
             if (id != customer.Id) return NotFound();
+
+            customer.TenantId = _tenantProvider.GetTenantId();
 
             if (ModelState.IsValid)
             {
