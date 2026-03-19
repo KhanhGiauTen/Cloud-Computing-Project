@@ -118,14 +118,14 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // ============================================================================
 // Notification Service Registration
 // ============================================================================
-// Always use AWS-backed notification service in this deployment. The AWS SDK
-// will resolve credentials from any supported source (env vars, IAM role,
-// shared credentials file, etc.).
+// Use AWS-backed notification service. Clients are created with the default
+// AWS credential/region resolution (env vars, IAM role, shared credentials,
+// etc.), so we avoid calling GetAWSOptions (which does not match the
+// installed AWSSDK.Extensions.NETCore.Setup version).
 // ============================================================================
 
-builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
-builder.Services.AddAWSService<IAmazonSimpleNotificationService>();
-builder.Services.AddAWSService<IAmazonSimpleEmailService>();
+builder.Services.AddSingleton<IAmazonSimpleNotificationService>(_ => new AmazonSimpleNotificationServiceClient());
+builder.Services.AddSingleton<IAmazonSimpleEmailService>(_ => new AmazonSimpleEmailServiceClient());
 builder.Services.AddScoped<INotificationService, AwsNotificationService>();
 Console.WriteLine("✅ Using AWS Notification Service (SES/SNS)");
 
