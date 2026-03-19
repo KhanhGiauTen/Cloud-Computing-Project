@@ -21,6 +21,8 @@ namespace CloudContactManager.Services.API
         public async Task<bool> SendSmsAsync(string phoneNumber, string message, CancellationToken cancellationToken = default)
         {
             var accessToken = _configuration["SpeedSMS:AccessToken"];
+            var sender = _configuration["SpeedSMS:Sender"]; // cần cho sms_type = 2
+
             if (string.IsNullOrWhiteSpace(accessToken))
             {
                 _logger.LogError("SpeedSMS:AccessToken is missing");
@@ -33,89 +35,115 @@ namespace CloudContactManager.Services.API
                 return false;
             }
 
-            // Chuẩn hóa số điện thoại về dạng 84xxxxxxxxx (yêu cầu của SpeedSMS, không có '+').
+            // Normalize phone
             var normalizedPhone = phoneNumber.Trim();
             if (normalizedPhone.StartsWith("+84"))
             {
-                // +8493xxxxxxx -> 8493xxxxxxx
                 normalizedPhone = normalizedPhone.Substring(1);
             }
             else if (normalizedPhone.StartsWith("0") && normalizedPhone.Length == 10)
             {
-                // 09xxxxxxxx -> 84xxxxxxxxx
                 normalizedPhone = "84" + normalizedPhone.Substring(1);
             }
 
             if (!normalizedPhone.StartsWith("84"))
             {
-                _logger.LogWarning("Invalid VN phone format for SpeedSMS: {Phone}", phoneNumber);
+                _logger.LogWarning("Invalid VN phone format: {Phone}", phoneNumber);
                 return false;
             }
 
-            // Dùng sms_type = 4 cho OTP/verify theo hướng dẫn SpeedSMS.
-            // Quan trọng: khi dùng type 4, KHÔNG gửi kèm sender để tránh lỗi "sender not found".
-            const int smsType = 4;
+            // ⚠️ fallback strategy
+            var useOtp = true;
 
-            var payload = new
-            {
-                to = new[] { normalizedPhone },
-                content = message,
-                sms_type = smsType
-                // Không có trường 'sender' trong payload
-            };
+            var payload = useOtp
+                ? new
+                {
+                    to = new[] { normalizedPhone },
+                    content = message,
+                    sms_type = 4
+                }
+                : new
+                {
+                    to = new[] { normalizedPhone },
+                    content = message,
+                    sms_type = 2,
+                    sender = sender
+                };
 
             var json = JsonSerializer.Serialize(payload);
+
             using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.speedsms.vn/index.php/sms/send")
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json")
             };
 
-            // SpeedSMS uses HTTP Basic auth with the token as username and empty password.
-            // Authorization: Basic base64("<token>:")
             var raw = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{accessToken}:"));
             request.Headers.Authorization = new AuthenticationHeaderValue("Basic", raw);
 
-            _logger.LogInformation("SpeedSMS request to {Phone}: {Payload}", normalizedPhone, json);
+            _logger.LogInformation("SpeedSMS request: {Payload}", json);
 
             using var response = await _httpClient.SendAsync(request, cancellationToken);
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
 
-            _logger.LogInformation("SpeedSMS response {StatusCode} for {Phone}: {Body}",
-                (int)response.StatusCode, normalizedPhone, body);
+            _logger.LogInformation("SpeedSMS response {StatusCode}: {Body}", (int)response.StatusCode, body);
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("SpeedSMS returned non-success HTTP status: {StatusCode}", (int)response.StatusCode);
                 return false;
             }
 
-            // SpeedSMS returns JSON: { "status": "success" | "error", "code": "..", ... }
             try
             {
                 using var doc = JsonDocument.Parse(body);
                 var root = doc.RootElement;
-                if (root.TryGetProperty("status", out var statusProp))
+
+                var status = root.GetProperty("status").GetString();
+
+                if (status == "success")
                 {
-                    var status = statusProp.GetString();
-                    if (string.Equals(status, "success", StringComparison.OrdinalIgnoreCase))
-                    {
-                        return true;
-                    }
-
-                    var code = root.TryGetProperty("code", out var codeProp) ? codeProp.GetString() : null;
-                    var msg = root.TryGetProperty("message", out var msgProp) ? msgProp.GetString() : null;
-
-                    _logger.LogWarning("SpeedSMS returned error status for {Phone}. status={Status}, code={Code}, message={Message}",
-                        normalizedPhone, status, code, msg);
-                    return false;
+                    return true;
                 }
 
-                _logger.LogWarning("SpeedSMS response has no 'status' field. Body: {Body}", body);
+                var messageErr = root.TryGetProperty("message", out var msg) ? msg.GetString() : null;
+
+                _logger.LogWarning("SpeedSMS error: {Message}", messageErr);
+
+                // 🔥 fallback nếu OTP fail
+                if (useOtp)
+                {
+                    _logger.LogWarning("Retry with sms_type = 2");
+
+                    var fallbackPayload = new
+                    {
+                        to = new[] { normalizedPhone },
+                        content = message,
+                        sms_type = 2,
+                        sender = sender
+                    };
+
+                    var fallbackJson = JsonSerializer.Serialize(fallbackPayload);
+
+                    using var retryRequest = new HttpRequestMessage(HttpMethod.Post, "https://api.speedsms.vn/index.php/sms/send")
+                    {
+                        Content = new StringContent(fallbackJson, Encoding.UTF8, "application/json")
+                    };
+
+                    retryRequest.Headers.Authorization = new AuthenticationHeaderValue("Basic", raw);
+
+                    var retryResponse = await _httpClient.SendAsync(retryRequest, cancellationToken);
+                    var retryBody = await retryResponse.Content.ReadAsStringAsync(cancellationToken);
+
+                    _logger.LogInformation("Retry response: {Body}", retryBody);
+
+                    using var retryDoc = JsonDocument.Parse(retryBody);
+                    return retryDoc.RootElement.GetProperty("status").GetString() == "success";
+                }
+
                 return false;
             }
-            catch (JsonException ex)
+            catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to parse SpeedSMS JSON response: {Body}", body);
+                _logger.LogError(ex, "Failed to parse response");
                 return false;
             }
         }
