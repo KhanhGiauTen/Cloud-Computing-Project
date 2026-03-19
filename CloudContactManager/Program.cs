@@ -126,8 +126,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddSingleton<IAmazonSimpleNotificationService>(_ => new AmazonSimpleNotificationServiceClient());
 builder.Services.AddSingleton<IAmazonSimpleEmailService>(_ => new AmazonSimpleEmailServiceClient());
-builder.Services.AddScoped<INotificationService, AwsNotificationService>();
-Console.WriteLine("✅ Using AWS Notification Service (SES/SNS)");
+
+// Use SpeedSMS for SMS delivery (via Speedsmsapi) and AWS SES for email.
+// This implementation is provided by SpeedSmsNotificationService.
+builder.Services.AddScoped<INotificationService, SpeedSmsNotificationService>();
+Console.WriteLine("✅ Using SpeedSMS for SMS and AWS SES for email notifications");
 
 var app = builder.Build();
 
