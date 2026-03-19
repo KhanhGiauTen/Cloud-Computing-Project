@@ -23,6 +23,19 @@ namespace CloudContactManager.Services.API
                 return false;
             }
 
+            // Chuẩn hóa số điện thoại theo chuẩn nội địa VN cho SpeedSMS.
+            var normalizedPhone = phoneNumber.Trim();
+            if (normalizedPhone.StartsWith("+84"))
+            {
+                // +8493xxxxxxx -> 093xxxxxxx
+                normalizedPhone = "0" + normalizedPhone.Substring(3);
+            }
+            else if (normalizedPhone.StartsWith("84") && normalizedPhone.Length == 11)
+            {
+                // 8493xxxxxxx -> 093xxxxxxx
+                normalizedPhone = "0" + normalizedPhone.Substring(2);
+            }
+
             // Decide SMS type and sender based on configuration.
             // If a Device is configured, use type 5 (Android device) with deviceId as sender.
             // Otherwise, use type 2 (random number) and optional configured Sender/brandname.
@@ -43,7 +56,7 @@ namespace CloudContactManager.Services.API
 
             var payload = new
             {
-                to = new[] { phoneNumber },
+                to = new[] { normalizedPhone },
                 content = message,
                 sms_type = smsType,
                 sender
