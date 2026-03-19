@@ -118,38 +118,16 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // ============================================================================
 // Notification Service Registration
 // ============================================================================
-// LOCAL  → LocalNotificationService  (no AWS needed, logs to console)
-// AWS    → AwsNotificationService    (requires AWS credentials)
-// Switch by checking if AWS credentials are available
+// Always use AWS-backed notification service in this deployment. The AWS SDK
+// will resolve credentials from any supported source (env vars, IAM role,
+// shared credentials file, etc.).
 // ============================================================================
 
-var awsProfile = builder.Configuration.GetSection("AWS")["Profile"];
-var hasAwsEnvVars = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID"));
-var hasAwsProfile = false;
-
-if (!string.IsNullOrEmpty(awsProfile))
-{
-    var credFile = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".aws", "credentials");
-    hasAwsProfile = File.Exists(credFile);
-}
-
-if (hasAwsEnvVars || hasAwsProfile)
-{
-    // AWS credentials found → use real AWS services
-    builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
-    builder.Services.AddAWSService<IAmazonSimpleNotificationService>();
-    builder.Services.AddAWSService<IAmazonSimpleEmailService>();
-    builder.Services.AddScoped<INotificationService, AwsNotificationService>();
-    Console.WriteLine("✅ Using AWS Notification Service (SES/SNS)");
-}
-else
-{
-    // No AWS credentials → use local simulation
-    builder.Services.AddScoped<INotificationService, LocalNotificationService>();
-    Console.WriteLine("✅ Using Local Notification Service (console simulation)");
-}
+builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
+builder.Services.AddAWSService<IAmazonSimpleNotificationService>();
+builder.Services.AddAWSService<IAmazonSimpleEmailService>();
+builder.Services.AddScoped<INotificationService, AwsNotificationService>();
+Console.WriteLine("✅ Using AWS Notification Service (SES/SNS)");
 
 var app = builder.Build();
 
