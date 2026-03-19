@@ -14,7 +14,8 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllersWithViews();
+// API-only backend: we use controllers with attribute routing and no Razor views.
+builder.Services.AddControllers();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantProvider, HttpContextTenantProvider>();
 builder.Services.AddSingleton<IPasswordHasher<Tenant>, PasswordHasher<Tenant>>();
@@ -193,9 +194,8 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+// Use attribute routing for APIs (e.g., /api/auth/login, /api/auth/register)
+app.MapControllers();
 
 app.Run();
 

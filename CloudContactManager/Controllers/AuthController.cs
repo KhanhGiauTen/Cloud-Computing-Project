@@ -19,12 +19,6 @@ namespace CloudContactManager.Controllers
             _context = context;
             _passwordHasher = passwordHasher;
         }
-        
-        [HttpGet]
-        public IActionResult SignUp()
-        {
-            return View();
-        }
 
         [HttpPost("register")]
         public async Task<IActionResult> SignUp([FromBody] SignUpRequest request)
