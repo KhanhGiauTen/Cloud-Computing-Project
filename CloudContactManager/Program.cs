@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Amazon.SimpleEmail;
 using Amazon.SimpleNotificationService;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -110,9 +111,16 @@ else
     builder.Services.AddScoped<INotificationService, LocalNotificationService>();
     Console.WriteLine("✅ Using Local Notification Service (console simulation)");
 }
-
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    // Cấu hình để ASP.NET Core tin tưởng các Header do AWS Load Balancer gửi tới
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // Xóa giới hạn IP mặc định để nhận request từ mọi cấu hình ALB của AWS
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 var app = builder.Build();
-
+app.UseForwardedHeaders();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
