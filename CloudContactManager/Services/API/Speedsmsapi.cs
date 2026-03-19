@@ -23,12 +23,29 @@ namespace CloudContactManager.Services.API
                 return false;
             }
 
-            var sender = _configuration["SpeedSMS:Sender"] ?? "CloudContact";
+            // Decide SMS type and sender based on configuration.
+            // If a Device is configured, use type 5 (Android device) with deviceId as sender.
+            // Otherwise, use type 2 (random number) and optional configured Sender/brandname.
+            var deviceId = _configuration["SpeedSMS:Device"];
+            int smsType;
+            string sender;
+
+            if (!string.IsNullOrWhiteSpace(deviceId))
+            {
+                smsType = 5; // send via Android device
+                sender = deviceId;
+            }
+            else
+            {
+                smsType = 2; // random number
+                sender = _configuration["SpeedSMS:Sender"] ?? "CloudContact";
+            }
+
             var payload = new
             {
                 to = new[] { phoneNumber },
                 content = message,
-                sms_type = 2,
+                sms_type = smsType,
                 sender
             };
 
@@ -43,7 +60,32 @@ namespace CloudContactManager.Services.API
             request.Headers.Authorization = new AuthenticationHeaderValue("Basic", raw);
 
             using var response = await _httpClient.SendAsync(request, cancellationToken);
-            return response.IsSuccessStatusCode;
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                // Non-2xx from SpeedSMS => consider as failure
+                return false;
+            }
+
+            // SpeedSMS returns JSON: { "status": "success" | "error", "code": "..", ... }
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("status", out var statusProp))
+                {
+                    var status = statusProp.GetString();
+                    return string.Equals(status, "success", StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            catch
+            {
+                // If response is not valid JSON or unexpected, treat as failure
+                return false;
+            }
+
+            return false;
         }
     }
 }
