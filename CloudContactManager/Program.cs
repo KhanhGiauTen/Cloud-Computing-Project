@@ -113,6 +113,43 @@ else
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<Tenant>>();
+
+    if (!db.SubscriptionPlans.Any(p => p.PlanName == "Free"))
+    {
+        db.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            PlanName = "Free",
+            MaxCustomers = 100,
+            Price = 0m
+        });
+        db.SaveChanges();
+    }
+
+    if (!db.Tenants.Any(t => t.Email == "demo@cloudcontact.local"))
+    {
+        var freePlanId = db.SubscriptionPlans
+            .Where(p => p.PlanName == "Free")
+            .Select(p => p.Id)
+            .First();
+
+        var demoTenant = new Tenant
+        {
+            PlanId = freePlanId,
+            CompanyName = "Demo Company",
+            Email = "demo@cloudcontact.local",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        demoTenant.PasswordHash = hasher.HashPassword(demoTenant, "Demo@123");
+        db.Tenants.Add(demoTenant);
+        db.SaveChanges();
+    }
+}
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
