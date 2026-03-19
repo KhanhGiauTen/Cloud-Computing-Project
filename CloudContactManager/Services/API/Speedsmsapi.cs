@@ -36,7 +36,11 @@ namespace CloudContactManager.Services.API
             {
                 Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
             };
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            // SpeedSMS uses HTTP Basic auth with the token as username and empty password.
+            // Authorization: Basic base64("<token>:")
+            var raw = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{accessToken}:"));
+            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", raw);
 
             using var response = await _httpClient.SendAsync(request, cancellationToken);
             return response.IsSuccessStatusCode;
