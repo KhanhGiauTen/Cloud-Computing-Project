@@ -53,20 +53,15 @@ namespace CloudContactManager.Services.API
             }
 
             // Dùng sms_type = 4 cho OTP/verify theo hướng dẫn SpeedSMS.
+            // Quan trọng: khi dùng type 4, KHÔNG gửi kèm sender để tránh lỗi "sender not found".
             const int smsType = 4;
-            var sender = _configuration["SpeedSMS:Sender"]; // có thể cấu hình "Verify" hoặc "Notify"
-            if (string.IsNullOrWhiteSpace(sender))
-            {
-                // SpeedSMS dùng brandname mặc định Verify/Notify cho type=4. Dùng "Verify" nếu không cấu hình.
-                sender = "Verify";
-            }
 
             var payload = new
             {
                 to = new[] { normalizedPhone },
                 content = message,
-                sms_type = smsType,
-                sender
+                sms_type = smsType
+                // Không có trường 'sender' trong payload
             };
 
             var json = JsonSerializer.Serialize(payload);
