@@ -54,7 +54,12 @@ namespace CloudContactManager.Services.API
 
             // Dùng sms_type = 4 cho OTP/verify theo hướng dẫn SpeedSMS.
             const int smsType = 4;
-            var sender = _configuration["SpeedSMS:Sender"]; // có thể null cho type 4
+            var sender = _configuration["SpeedSMS:Sender"]; // có thể cấu hình "Verify" hoặc "Notify"
+            if (string.IsNullOrWhiteSpace(sender))
+            {
+                // SpeedSMS dùng brandname mặc định Verify/Notify cho type=4. Dùng "Verify" nếu không cấu hình.
+                sender = "Verify";
+            }
 
             var payload = new
             {
