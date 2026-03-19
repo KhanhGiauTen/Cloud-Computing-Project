@@ -1,85 +1,116 @@
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
-using Microsoft.Extensions.Logging;
+using System;
+using System.Net;
+using System.IO;
 
 namespace CloudContactManager.Services.API
 {
-    public class Speedsmsapi
-    {
-        private readonly HttpClient _httpClient;
-        private readonly IConfiguration _configuration;
-        private readonly ILogger<Speedsmsapi> _logger;
+	// SpeedSMS API client implemented giống mẫu gốc từ SpeedSMS
+	public class Speedsmsapi
+	{
+		public const int TYPE_QC = 1;
+		public const int TYPE_CSKH = 2;
+		public const int TYPE_BRANDNAME = 3;
+		public const int TYPE_BRANDNAME_NOTIFY = 4; // Gửi sms sử dụng brandname Notify
+		public const int TYPE_GATEWAY = 5; // Gửi sms sử dụng app android từ số di động cá nhân
 
-        public Speedsmsapi(HttpClient httpClient, IConfiguration configuration, ILogger<Speedsmsapi> logger)
-        {
-            _httpClient = httpClient;
-            _configuration = configuration;
-            _logger = logger;
-        }
+		private const string rootURL = "https://api.speedsms.vn/index.php";
+		private string accessToken = "sqzsGRMSfm3bKdNDO22sBYL_ofsfBnWw";
 
-        public async Task<bool> SendSmsAsync(string phoneNumber, string message, CancellationToken cancellationToken = default)
-        {
-            var accessToken = _configuration["SpeedSMS:AccessToken"];
-            var sender = _configuration["SpeedSMS:Sender"];
+		public Speedsmsapi()
+		{
+		}
 
-            if (string.IsNullOrWhiteSpace(accessToken))
-            {
-                _logger.LogError("Missing AccessToken");
-                return false;
-            }
+		public Speedsmsapi(string token)
+		{
+			this.accessToken = token;
+		}
 
-            // Normalize phone
-            var normalizedPhone = phoneNumber.Trim();
-            if (normalizedPhone.StartsWith("+84"))
-                normalizedPhone = normalizedPhone.Substring(1);
-            else if (normalizedPhone.StartsWith("0") && normalizedPhone.Length == 10)
-                normalizedPhone = "84" + normalizedPhone.Substring(1);
+		private string EncodeNonAsciiCharacters(string value)
+		{
+			var sb = new System.Text.StringBuilder();
+			foreach (char c in value)
+			{
+				if (c > 127)
+				{
+					string encodedValue = "\\u" + ((int)c).ToString("x4");
+					sb.Append(encodedValue);
+				}
+				else
+				{
+					sb.Append(c);
+				}
+			}
+			return sb.ToString();
+		}
 
-            object payload;
+		public string getUserInfo()
+		{
+			string url = rootURL + "/user/info";
+			NetworkCredential myCreds = new NetworkCredential(accessToken, ":x");
+			using var client = new WebClient();
+			client.Credentials = myCreds;
+			using Stream data = client.OpenRead(url);
+			using var reader = new StreamReader(data);
+			return reader.ReadToEnd();
+		}
 
-            bool useOtp = true;
+		public string sendSMS(string[] phones, string content, int type, string sender)
+		{
+			string url = rootURL + "/sms/send";
+			if (phones == null || phones.Length <= 0)
+				return string.Empty;
+			if (string.IsNullOrEmpty(content))
+				return string.Empty;
 
-            if (useOtp)
-            {
-                payload = new
-                {
-                    to = new[] { normalizedPhone },
-                    content = message,
-                    sms_type = 4
-                };
-            }
-            else
-            {
-                payload = new
-                {
-                    to = new[] { normalizedPhone },
-                    content = message,
-                    sms_type = 2,
-                    sender = sender
-                };
-            }
+			if (type == TYPE_BRANDNAME && string.IsNullOrEmpty(sender))
+				return string.Empty;
 
-            var json = JsonSerializer.Serialize(payload);
+			NetworkCredential myCreds = new NetworkCredential(accessToken, ":x");
+			using var client = new WebClient();
+			client.Credentials = myCreds;
+			client.Headers[HttpRequestHeader.ContentType] = "application/json";
 
-            using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.speedsms.vn/index.php/sms/send");
+			string builder = "{\"to\":[";
+			for (int i = 0; i < phones.Length; i++)
+			{
+				builder += "\"" + phones[i] + "\"";
+				if (i < phones.Length - 1)
+				{
+					builder += ",";
+				}
+			}
+			builder += "], \"content\": \"" + Uri.EscapeDataString(content) + "\", \"type\":" + type + ", \"sender\": \"" + sender + "\"}";
 
-            var content = new StringContent(json, Encoding.UTF8);
-            content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+			string json = builder;
+			return client.UploadString(url, json);
+		}
 
-            request.Content = content;
+		public string sendMMS(string[] phones, string content, string link, string sender)
+		{
+			string url = rootURL + "/mms/send";
+			if (phones == null || phones.Length <= 0)
+				return string.Empty;
+			if (string.IsNullOrEmpty(content))
+				return string.Empty;
 
-            var raw = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{accessToken}:"));
-            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", raw);
+			NetworkCredential myCreds = new NetworkCredential(accessToken, ":x");
+			using var client = new WebClient();
+			client.Credentials = myCreds;
+			client.Headers[HttpRequestHeader.ContentType] = "application/json";
 
-            _logger.LogInformation("Payload: {Payload}", json);
+			string builder = "{\"to\":[";
+			for (int i = 0; i < phones.Length; i++)
+			{
+				builder += "\"" + phones[i] + "\"";
+				if (i < phones.Length - 1)
+				{
+					builder += ",";
+				}
+			}
+			builder += "], \"content\": \"" + Uri.EscapeDataString(content) + "\", \"link\": \"" + link + "\", \"sender\": \"" + sender + "\"}";
 
-            var response = await _httpClient.SendAsync(request, cancellationToken);
-            var body = await response.Content.ReadAsStringAsync();
-
-            _logger.LogInformation("Response: {Body}", body);
-
-            return body.Contains("success");
-        }
-    }
+			string json = builder;
+			return client.UploadString(url, json);
+		}
+	}
 }

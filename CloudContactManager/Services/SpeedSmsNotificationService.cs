@@ -30,17 +30,53 @@ namespace CloudContactManager.Services
             _logger = logger;
         }
 
-        public async Task SendSmsAsync(string phoneNumber, string message)
+        public Task SendSmsAsync(string phoneNumber, string message)
         {
-            var ok = await _speedSmsApi.SendSmsAsync(phoneNumber, message);
-            if (!ok)
+            try
             {
-                _logger.LogWarning("SpeedSMS failed to send SMS to {PhoneNumber}", phoneNumber);
+                // Gọi SpeedSMS client theo đúng SDK: gửi dạng CSKH (TYPE_CSKH), không dùng brandname
+                var json = _speedSmsApi.sendSMS(
+                    new[] { phoneNumber },
+                    message,
+                    Speedsmsapi.TYPE_CSKH,
+                    string.Empty);
+
+                var ok = false;
+                if (!string.IsNullOrWhiteSpace(json))
+                {
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(json);
+                        var root = doc.RootElement;
+                        if (root.TryGetProperty("status", out var statusProp))
+                        {
+                            var status = statusProp.GetString();
+                            ok = string.Equals(status, "success", StringComparison.OrdinalIgnoreCase);
+                        }
+                    }
+                    catch
+                    {
+                        // Nếu parse JSON lỗi, xem như thất bại
+                        ok = false;
+                    }
+                }
+
+                if (!ok)
+                {
+                    _logger.LogWarning("SpeedSMS failed to send SMS to {PhoneNumber}. Raw response: {Response}", phoneNumber, json);
+                }
+                else
+                {
+                    _logger.LogInformation("SpeedSMS sent SMS to {PhoneNumber}", phoneNumber);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                _logger.LogInformation("SpeedSMS sent SMS to {PhoneNumber}", phoneNumber);
+                _logger.LogError(ex, "Exception while sending SMS to {PhoneNumber} via SpeedSMS", phoneNumber);
             }
+
+            // API gốc là đồng bộ, nên ta bọc lại thành Task cho interface INotificationService
+            return Task.CompletedTask;
         }
 
         public async Task SendEmailAsync(string toEmail, string subject, string body)

@@ -19,8 +19,8 @@ builder.Services.AddControllers();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantProvider, HttpContextTenantProvider>();
 builder.Services.AddSingleton<IPasswordHasher<Tenant>, PasswordHasher<Tenant>>();
-builder.Services.AddHttpClient<Speedsmsapi>();
-builder.Services.AddScoped<NotificationServices>();
+// SpeedSMS client (SDK-style) and notification service
+builder.Services.AddSingleton<Speedsmsapi>();
 
 // Allow cross-origin calls from external UI (SPA/static HTML)
 builder.Services.AddCors(options =>
