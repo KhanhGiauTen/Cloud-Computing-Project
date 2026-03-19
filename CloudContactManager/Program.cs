@@ -22,6 +22,17 @@ builder.Services.AddSingleton<IPasswordHasher<Tenant>, PasswordHasher<Tenant>>()
 builder.Services.AddHttpClient<Speedsmsapi>();
 builder.Services.AddScoped<NotificationServices>();
 
+// Allow cross-origin calls from external UI (SPA/static HTML)
+builder.Services.AddCors(options =>
+{
+	options.AddPolicy("AllowAll", policy =>
+	{
+		policy.AllowAnyOrigin()
+			.AllowAnyHeader()
+			.AllowAnyMethod();
+	});
+});
+
 // Configure JWT authentication so APIs like /api/auth/login and /api/auth/register can issue and validate tokens
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtKey = jwtSection["Key"] ?? throw new InvalidOperationException("Jwt:Key is missing.");
@@ -190,6 +201,9 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
+
+// Enable CORS for external UI calling this API from another origin
+app.UseCors("AllowAll");
 
 app.UseAuthentication();
 app.UseAuthorization();
