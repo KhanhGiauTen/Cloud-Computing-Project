@@ -128,19 +128,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddSingleton<IAmazonSimpleNotificationService>(_ => new AmazonSimpleNotificationServiceClient());
 builder.Services.AddSingleton<IAmazonSimpleEmailService>(_ => new AmazonSimpleEmailServiceClient());
 
-// Use environment-based notification services, following V4 logic.
-if (builder.Environment.IsProduction() || builder.Environment.IsStaging())
-{
-	// Production/Staging: real email (AWS SES) and SMS (SpeedSMS HTTP API)
-	builder.Services.AddScoped<INotificationService, SpeedSmsNotificationService>();
-	Console.WriteLine("Using AWS SES for Email and Speed SMS for SMS");
-}
-else
-{
-	// Development: local simulation via console/logs
-	builder.Services.AddScoped<INotificationService, LocalNotificationService>();
-	Console.WriteLine("Using Local Notification Service (console simulation)");
-}
+// Always use real notification service (Speed SMS + AWS SES) so SMS are sent
+// to real phone numbers in all environments.
+builder.Services.AddScoped<INotificationService, SpeedSmsNotificationService>();
+Console.WriteLine("Using AWS SES for Email and Speed SMS for SMS in all environments");
 
 var app = builder.Build();
 
