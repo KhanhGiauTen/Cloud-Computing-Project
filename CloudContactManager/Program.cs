@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Amazon.SimpleEmail;
 using Amazon.SimpleNotificationService;
+using Microsoft.AspNetCore.HttpOverrides;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -127,13 +128,44 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddSingleton<IAmazonSimpleNotificationService>(_ => new AmazonSimpleNotificationServiceClient());
 builder.Services.AddSingleton<IAmazonSimpleEmailService>(_ => new AmazonSimpleEmailServiceClient());
 
+if (!string.IsNullOrEmpty(awsProfile))
+{
+    var credFile = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".aws", "credentials");
+    hasAwsProfile = File.Exists(credFile);
+}
+
+if (hasAwsEnvVars || hasAwsProfile)
+{
+    // AWS credentials found → use real AWS services
+    builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
+    builder.Services.AddAWSService<IAmazonSimpleNotificationService>();
+    builder.Services.AddAWSService<IAmazonSimpleEmailService>();
+    builder.Services.AddScoped<INotificationService, AwsNotificationService>();
+    Console.WriteLine("✅ Using AWS Notification Service (SES/SNS)");
+}
+else
+{
+    // No AWS credentials → use local simulation
+    builder.Services.AddScoped<INotificationService, LocalNotificationService>();
+    Console.WriteLine("✅ Using Local Notification Service (console simulation)");
+}
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    // Cấu hình để ASP.NET Core tin tưởng các Header do AWS Load Balancer gửi tới
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // Xóa giới hạn IP mặc định để nhận request từ mọi cấu hình ALB của AWS
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 // Use SpeedSMS for SMS delivery (via Speedsmsapi) and AWS SES for email.
 // This implementation is provided by SpeedSmsNotificationService.
 builder.Services.AddScoped<INotificationService, SpeedSmsNotificationService>();
 Console.WriteLine("✅ Using SpeedSMS for SMS and AWS SES for email notifications");
 
 var app = builder.Build();
-
+app.UseForwardedHeaders();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
