@@ -67,8 +67,8 @@ namespace CloudContactManager.Services
         // ================= SMS (SpeedSMS via Speedsmsapi SDK) =================
         public async Task SendSmsAsync(string phoneNumber, string message)
         {
-            var token = _configuration["SpeedSMS:AccessToken"];
-            var sender = _configuration["SpeedSMS:Device"];
+            string token = _configuration["SpeedSMS:AccessToken"];
+            string sender = _configuration["SpeedSMS:Device"];
 
             if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(sender))
             {
@@ -79,12 +79,12 @@ namespace CloudContactManager.Services
             try
             {
                 var api = new Speedsmsapi(token);
-                var phones = new[] { phoneNumber };
-                var type = Speedsmsapi.TYPE_GATEWAY;
+                string[] phones = new[] { phoneNumber };
+                int type = Speedsmsapi.TYPE_GATEWAY;
 
-                // Run sync SDK call on a background thread to keep async signature.
-                var response = api.sendSMS(phones, message, type, sender);
+                string response = api.sendSMS(phones, message, type, sender);
                 await Task.CompletedTask;
+
                 _logger.LogInformation("SpeedSMS send response: {Response}", response);
             }
             catch (Exception ex)
