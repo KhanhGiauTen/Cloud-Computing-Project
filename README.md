@@ -13,31 +13,14 @@ A SaaS application for customer contact management built with ASP.NET Core 8.0 M
 ## Project Structure
 
 ```
-CloudContactManager/
-├── Controllers/
-│   ├── HomeController.cs
-│   ├── CustomersController.cs          # Customer CRUD operations
-│   └── CommunicationController.cs      # Bulk SMS/Email operations
-├── Data/
-│   └── AppDbContext.cs                 # EF Core DbContext
-├── Models/
-│   └── Customer.cs                     # Customer entity with validation
-├── ViewModels/
-│   └── CommunicationRequest.cs         # ViewModel for bulk communication
-├── Services/
-│   ├── Interfaces/
-│   │   └── INotificationService.cs     # Notification service interface
-│   ├── AwsNotificationService.cs       # AWS SES/SNS implementation
-│   └── LocalNotificationService.cs     # Local simulation (no AWS required)
-├── Migrations/                         # EF Core migrations
-├── Views/
-│   ├── Customers/                      # Index, Create, Edit, Delete
-│   ├── Communication/                  # Bulk send with checkbox selection
-│   ├── Home/
-│   └── Shared/
-├── wwwroot/
-├── appsettings.json
-└── Program.cs
+.
+├── backend/
+│   ├── CloudContactManager/            # ASP.NET Core backend/API project
+│   └── CloudContactManager.Tests/      # Unit test project
+├── frontend/                           # Frontend folder (separated)
+├── docs/
+├── README.md
+└── RUNNING_LOCALLY.md
 ```
 
 ## Components
@@ -139,7 +122,7 @@ Open `appsettings.json` and verify the connection string:
 
 ### Step 2 — Create the database
 
-Run once in a terminal inside the project folder:
+Run once in a terminal inside `backend/CloudContactManager`:
 
 ```powershell
 dotnet ef migrations add InitialCreate
@@ -157,7 +140,7 @@ Get-Process -Name CloudContactManager -ErrorAction SilentlyContinue | Stop-Proce
 
 Start the app (opens a new CMD window as the server):
 ```powershell
-Start-Process cmd -ArgumentList '/k cd /d D:\CS\CLOUDCOMPUTING\V2\Cloud-Computing-Final-Project\CloudContactManager && dotnet run --urls http://localhost:5028'
+Start-Process cmd -ArgumentList '/k cd /d D:\CS\CLOUDCOMPUTING\V5\Cloud-Computing-Final-Project\backend\CloudContactManager && dotnet run --urls http://localhost:5028'
 ```
 
 > A black CMD window will open — that is the running server. **Do not close it.**

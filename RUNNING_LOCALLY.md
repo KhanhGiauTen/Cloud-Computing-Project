@@ -13,7 +13,7 @@
 ## First-Time Setup — Create the Database
 
 ```powershell
-cd D:\CS\CLOUDCOMPUTING\V2\Cloud-Computing-Final-Project\CloudContactManager
+cd D:\CS\CLOUDCOMPUTING\V5\Cloud-Computing-Final-Project\backend\CloudContactManager
 dotnet ef migrations add InitialCreate
 dotnet ef database update
 ```
@@ -27,7 +27,7 @@ Get-Process -Name CloudContactManager -ErrorAction SilentlyContinue | Stop-Proce
 
 **Step 2 — Start the app:**
 ```powershell
-Start-Process cmd -ArgumentList '/k cd /d D:\CS\CLOUDCOMPUTING\V2\Cloud-Computing-Final-Project\CloudContactManager && dotnet run --urls http://localhost:5028'
+Start-Process cmd -ArgumentList '/k cd /d D:\CS\CLOUDCOMPUTING\V5\Cloud-Computing-Final-Project\backend\CloudContactManager && dotnet run --urls http://localhost:5028'
 ```
 
 A black CMD window will open — that is the server. **Do not close it.**
