@@ -83,8 +83,8 @@ namespace CloudContactManager.Services
                 var type = Speedsmsapi.TYPE_GATEWAY;
 
                 // Run sync SDK call on a background thread to keep async signature.
-                var response = await Task.Run(() => api.sendSMS(phones, message, type, sender));
-
+                var response = api.sendSMS(phones, message, type, sender);
+                await Task.CompletedTask;
                 _logger.LogInformation("SpeedSMS send response: {Response}", response);
             }
             catch (Exception ex)
