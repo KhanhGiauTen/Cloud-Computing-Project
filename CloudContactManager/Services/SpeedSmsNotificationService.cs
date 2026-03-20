@@ -1,91 +1,40 @@
 using Amazon.SimpleEmail;
 using Amazon.SimpleEmail.Model;
-using CloudContactManager.Services.API;
 using CloudContactManager.Services.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Net.Http.Headers;
+using System.Text;
 
 namespace CloudContactManager.Services
 {
     /// <summary>
-    /// Notification service implementation that sends SMS via SpeedSMS
-    /// (Speedsmsapi) and emails via AWS SES.
+    /// Notification service implementation that sends Email via AWS SES
+    /// and SMS via SpeedSMS HTTP API, following the V4 logic.
     /// </summary>
     public class SpeedSmsNotificationService : INotificationService
     {
-        private readonly Speedsmsapi _speedSmsApi;
         private readonly IAmazonSimpleEmailService _sesClient;
         private readonly IConfiguration _configuration;
+        private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<SpeedSmsNotificationService> _logger;
 
         public SpeedSmsNotificationService(
-            Speedsmsapi speedSmsApi,
             IAmazonSimpleEmailService sesClient,
             IConfiguration configuration,
+            IHttpClientFactory httpClientFactory,
             ILogger<SpeedSmsNotificationService> logger)
         {
-            _speedSmsApi = speedSmsApi;
             _sesClient = sesClient;
             _configuration = configuration;
+            _httpClientFactory = httpClientFactory;
             _logger = logger;
         }
 
-        public Task SendSmsAsync(string phoneNumber, string message)
-        {
-            try
-            {
-                // Gọi SpeedSMS client theo đúng SDK: gửi dạng CSKH (TYPE_CSKH), không dùng brandname
-                var json = _speedSmsApi.sendSMS(
-                    new[] { phoneNumber },
-                    message,
-                    Speedsmsapi.TYPE_CSKH,
-                    string.Empty);
-
-                var ok = false;
-                if (!string.IsNullOrWhiteSpace(json))
-                {
-                    try
-                    {
-                        using var doc = System.Text.Json.JsonDocument.Parse(json);
-                        var root = doc.RootElement;
-                        if (root.TryGetProperty("status", out var statusProp))
-                        {
-                            var status = statusProp.GetString();
-                            ok = string.Equals(status, "success", StringComparison.OrdinalIgnoreCase);
-                        }
-                    }
-                    catch
-                    {
-                        // Nếu parse JSON lỗi, xem như thất bại
-                        ok = false;
-                    }
-                }
-
-                if (!ok)
-                {
-                    _logger.LogWarning("SpeedSMS failed to send SMS to {PhoneNumber}. Raw response: {Response}", phoneNumber, json);
-                }
-                else
-                {
-                    _logger.LogInformation("SpeedSMS sent SMS to {PhoneNumber}", phoneNumber);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Exception while sending SMS to {PhoneNumber} via SpeedSMS", phoneNumber);
-            }
-
-            // API gốc là đồng bộ, nên ta bọc lại thành Task cho interface INotificationService
-            return Task.CompletedTask;
-        }
-
+        // ================= EMAIL (AWS SES) =================
         public async Task SendEmailAsync(string toEmail, string subject, string body)
         {
             var sender = _configuration["AWS:SenderEmail"];
-            if (string.IsNullOrWhiteSpace(sender))
-            {
-                throw new InvalidOperationException("AWS:SenderEmail is missing in configuration.");
-            }
 
             var request = new SendEmailRequest
             {
@@ -99,27 +48,76 @@ namespace CloudContactManager.Services
                     Subject = new Content(subject),
                     Body = new Body
                     {
-                        Text = new Content(body),
-                        Html = new Content($"<p>{body}</p>")
+                        Html = new Content(body)
                     }
                 }
             };
 
-            var response = await _sesClient.SendEmailAsync(request);
-            _logger.LogInformation("Email sent to {ToEmail}. Message ID: {MessageId}", toEmail, response.MessageId);
+            try
+            {
+                await _sesClient.SendEmailAsync(request);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Email Error: {ex.Message}");
+            }
         }
 
+        // ================= SMS (SpeedSMS) =================
+        public async Task SendSmsAsync(string phoneNumber, string message)
+        {
+            var token = _configuration["SpeedSMS:AccessToken"];
+            var device = _configuration["SpeedSMS:Device"];
+
+            if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(device))
+            {
+                _logger.LogWarning("SpeedSMS configuration is missing. Skipping SMS send.");
+                return;
+            }
+
+            var client = _httpClientFactory.CreateClient();
+
+            // Basic auth with token as username and ":x" as password per SpeedSMS docs
+            var authBytes = Encoding.ASCII.GetBytes($"{token}:x");
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Basic", Convert.ToBase64String(authBytes));
+
+            var payload = new
+            {
+                to = new[] { phoneNumber },
+                content = message,
+                sms_type = 5,
+                sender = device
+            };
+
+            var json = System.Text.Json.JsonSerializer.Serialize(payload);
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await client.PostAsync("https://api.speedsms.vn/index.php/sms/send", content);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                _logger.LogError("SpeedSMS send failed. StatusCode={StatusCode}, Body={Body}",
+                    (int)response.StatusCode, errorBody);
+            }
+        }
+
+        // ================= BULK =================
         public async Task SendBulkAsync(List<string> recipients, string message, string type)
         {
-            foreach (var recipient in recipients)
+            if (type.Equals("Email", StringComparison.OrdinalIgnoreCase))
             {
-                if (type.Equals("SMS", StringComparison.OrdinalIgnoreCase))
+                foreach (var email in recipients)
                 {
-                    await SendSmsAsync(recipient, message);
+                    await SendEmailAsync(email, "Notification", message);
                 }
-                else if (type.Equals("Email", StringComparison.OrdinalIgnoreCase))
+            }
+            else if (type.Equals("SMS", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var phone in recipients)
                 {
-                    await SendEmailAsync(recipient, "Cloud Contact Notification", message);
+                    await SendSmsAsync(phone, message);
                 }
             }
         }

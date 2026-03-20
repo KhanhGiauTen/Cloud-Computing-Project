@@ -19,8 +19,9 @@ builder.Services.AddControllers();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantProvider, HttpContextTenantProvider>();
 builder.Services.AddSingleton<IPasswordHasher<Tenant>, PasswordHasher<Tenant>>();
-// SpeedSMS client (SDK-style) and notification service
+// SpeedSMS client (SDK-style) and HTTP client support for SMS API
 builder.Services.AddSingleton<Speedsmsapi>();
+builder.Services.AddHttpClient();
 
 // Allow cross-origin calls from external UI (SPA/static HTML)
 builder.Services.AddCors(options =>
@@ -127,10 +128,19 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddSingleton<IAmazonSimpleNotificationService>(_ => new AmazonSimpleNotificationServiceClient());
 builder.Services.AddSingleton<IAmazonSimpleEmailService>(_ => new AmazonSimpleEmailServiceClient());
 
-// Use SpeedSMS for SMS delivery (via Speedsmsapi) and AWS SES for email.
-// This implementation is provided by SpeedSmsNotificationService.
-builder.Services.AddScoped<INotificationService, SpeedSmsNotificationService>();
-Console.WriteLine("✅ Using SpeedSMS for SMS and AWS SES for email notifications");
+// Use environment-based notification services, following V4 logic.
+if (builder.Environment.IsProduction() || builder.Environment.IsStaging())
+{
+	// Production/Staging: real email (AWS SES) and SMS (SpeedSMS HTTP API)
+	builder.Services.AddScoped<INotificationService, SpeedSmsNotificationService>();
+	Console.WriteLine("Using AWS SES for Email and Speed SMS for SMS");
+}
+else
+{
+	// Development: local simulation via console/logs
+	builder.Services.AddScoped<INotificationService, LocalNotificationService>();
+	Console.WriteLine("Using Local Notification Service (console simulation)");
+}
 
 var app = builder.Build();
 
