@@ -1,15 +1,21 @@
 using CloudContactManager.Data;
 using CloudContactManager.Models;
 using CloudContactManager.Services.Interfaces;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace CloudContactManager.Controllers
 {
     /// <summary>
-    /// Controller for Customer CRUD operations.
+    /// Web API controller for Customer CRUD operations consumed by the external HTML UI.
+    /// Route base: /api/Customers
     /// </summary>
-    public class CustomersController : Controller
+    [ApiController]
+    [Route("api/[controller]")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    public class CustomersController : ControllerBase
     {
         private readonly AppDbContext _context;
         private readonly ITenantProvider _tenantProvider;
@@ -20,108 +26,101 @@ namespace CloudContactManager.Controllers
             _tenantProvider = tenantProvider;
         }
 
-        // GET: Customers
-
-        public async Task<IActionResult> Index()
+        // GET: api/Customers
+        // Used by Views/Customers/Index.html and Views/Communication/Index.html
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Customer>>> GetCustomers()
         {
-            var customers = await _context.Customers.ToListAsync();
-            return View(customers);
+            var customers = await _context.Customers
+                .OrderBy(c => c.FullName)
+                .ToListAsync();
+
+            return Ok(customers);
         }
 
-        // GET: Customers/Create
-        public IActionResult Create()
+        // GET: api/Customers/5
+        // Used by Edit.html and Delete.html
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Customer>> GetCustomer(int id)
         {
-            // TODO: Return create customer form view
-            return View();
-        }
-
-        // POST: Customers/Create
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(Customer customer)
-        {
-            // TODO: Validate and save new customer to database
-            // TODO: Call _notificationService.SendEmailAsync() to send welcome email
-            if (ModelState.IsValid)
-            {
-                customer.TenantId = _tenantProvider.GetTenantId();
-                _context.Add(customer) ;
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
-            }    
-            return View(customer);
-        }
-
-        // GET: Customers/Edit/5
-        public async Task<IActionResult> Edit(int? id)
-        {
-            // TODO: Retrieve customer by id and return edit form view
-            if (id == null) return NotFound();
-
             var customer = await _context.Customers.FindAsync(id);
-            if (customer == null) return NotFound();
 
-            return View(customer);
+            if (customer == null)
+            {
+                return NotFound(new { Message = "Không tìm thấy khách hàng." });
+            }
+
+            return Ok(customer);
         }
 
-        // POST: Customers/Edit/5
+        // POST: api/Customers
+        // Used by Create.html
         [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, Customer customer)
+        public async Task<ActionResult<Customer>> CreateCustomer([FromBody] Customer customer)
         {
-            // TODO: Validate and update customer in database
-            if (id != customer.Id) return NotFound();
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { Message = "Dữ liệu khách hàng không hợp lệ.", Errors = ModelState });
+            }
 
             customer.TenantId = _tenantProvider.GetTenantId();
 
-            if (ModelState.IsValid)
-            {
-                try
-                {
-                    _context.Update(customer);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!CustomerExists(customer.Id))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-                return RedirectToAction(nameof(Index));
-            }
-            return View(customer);
-        }
-
-        // GET: Customers/Delete/5
-        public async Task<IActionResult> Delete(int? id)
-        {
-            if (id == null) return NotFound();
-
-            var customer = await _context.Customers.FirstOrDefaultAsync(m => m.Id == id);
-            if (customer == null) return NotFound();
-
-            return View(customer);
-        }
-
-        // POST: Customers/Delete/5
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
-        {
-            // TODO: Delete customer from database
-            var customer = await _context.Customers.FindAsync(id);
-            if (customer != null)
-            {
-                _context.Customers.Remove(customer);
-            }
-
+            _context.Customers.Add(customer);
             await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
+
+            return CreatedAtAction(nameof(GetCustomer), new { id = customer.Id }, customer);
+        }
+
+        // PUT: api/Customers/5
+        // Used by Edit.html
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateCustomer(int id, [FromBody] Customer customer)
+        {
+            if (id != customer.Id)
+            {
+                return BadRequest(new { Message = "ID khách hàng không khớp." });
+            }
+
+            customer.TenantId = _tenantProvider.GetTenantId();
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { Message = "Dữ liệu khách hàng không hợp lệ.", Errors = ModelState });
+            }
+
+            _context.Entry(customer).State = EntityState.Modified;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!CustomerExists(id))
+                {
+                    return NotFound(new { Message = "Không tìm thấy khách hàng." });
+                }
+                throw;
+            }
+
+            return NoContent();
+        }
+
+        // DELETE: api/Customers/5
+        // Used by Delete.html
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteCustomer(int id)
+        {
+            var customer = await _context.Customers.FindAsync(id);
+            if (customer == null)
+            {
+                return NotFound(new { Message = "Không tìm thấy khách hàng." });
+            }
+
+            _context.Customers.Remove(customer);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = "Đã xóa khách hàng thành công." });
         }
 
         private bool CustomerExists(int id)

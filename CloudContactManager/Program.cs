@@ -5,19 +5,59 @@ using CloudContactManager.Services.API;
 using CloudContactManager.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using Amazon.SimpleEmail;
 using Amazon.SimpleNotificationService;
 using Microsoft.AspNetCore.HttpOverrides;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllersWithViews();
+// API-only backend: we use controllers with attribute routing and no Razor views.
+builder.Services.AddControllers();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantProvider, HttpContextTenantProvider>();
 builder.Services.AddSingleton<IPasswordHasher<Tenant>, PasswordHasher<Tenant>>();
-builder.Services.AddHttpClient<Speedsmsapi>();
-builder.Services.AddScoped<NotificationServices>();
+// SpeedSMS client (SDK-style) and notification service
+builder.Services.AddSingleton<Speedsmsapi>();
+
+// Allow cross-origin calls from external UI (SPA/static HTML)
+builder.Services.AddCors(options =>
+{
+	options.AddPolicy("AllowAll", policy =>
+	{
+		policy.AllowAnyOrigin()
+			.AllowAnyHeader()
+			.AllowAnyMethod();
+	});
+});
+
+// Configure JWT authentication so APIs like /api/auth/login and /api/auth/register can issue and validate tokens
+var jwtSection = builder.Configuration.GetSection("Jwt");
+var jwtKey = jwtSection["Key"] ?? throw new InvalidOperationException("Jwt:Key is missing.");
+var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+
+builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSection["Issuer"],
+            ValidAudience = jwtSection["Audience"],
+            IssuerSigningKey = signingKey,
+            ClockSkew = TimeSpan.Zero
+        };
+    });
 
 var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is missing.");
@@ -79,14 +119,14 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // ============================================================================
 // Notification Service Registration
 // ============================================================================
-// LOCAL  → LocalNotificationService  (no AWS needed, logs to console)
-// AWS    → AwsNotificationService    (requires AWS credentials)
-// Switch by checking if AWS credentials are available
+// Use AWS-backed notification service. Clients are created with the default
+// AWS credential/region resolution (env vars, IAM role, shared credentials,
+// etc.), so we avoid calling GetAWSOptions (which does not match the
+// installed AWSSDK.Extensions.NETCore.Setup version).
 // ============================================================================
 
-var awsProfile = builder.Configuration.GetSection("AWS")["Profile"];
-var hasAwsEnvVars = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID"));
-var hasAwsProfile = false;
+builder.Services.AddSingleton<IAmazonSimpleNotificationService>(_ => new AmazonSimpleNotificationServiceClient());
+builder.Services.AddSingleton<IAmazonSimpleEmailService>(_ => new AmazonSimpleEmailServiceClient());
 
 if (!string.IsNullOrEmpty(awsProfile))
 {
@@ -119,6 +159,11 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownNetworks.Clear();
     options.KnownProxies.Clear();
 });
+// Use SpeedSMS for SMS delivery (via Speedsmsapi) and AWS SES for email.
+// This implementation is provided by SpeedSmsNotificationService.
+builder.Services.AddScoped<INotificationService, SpeedSmsNotificationService>();
+Console.WriteLine("✅ Using SpeedSMS for SMS and AWS SES for email notifications");
+
 var app = builder.Build();
 app.UseForwardedHeaders();
 using (var scope = app.Services.CreateScope())
@@ -170,11 +215,14 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+// Enable CORS for external UI calling this API from another origin
+app.UseCors("AllowAll");
+
+app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+// Use attribute routing for APIs (e.g., /api/auth/login, /api/auth/register)
+app.MapControllers();
 
 app.Run();
 

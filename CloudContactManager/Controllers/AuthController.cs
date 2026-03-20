@@ -7,6 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CloudContactManager.Controllers
 {
+    [ApiController]
+    [Route("api/[controller]")]
     public class AuthController : Controller
     {
         private readonly AppDbContext _context;
@@ -18,7 +20,7 @@ namespace CloudContactManager.Controllers
             _passwordHasher = passwordHasher;
         }
 
-        [HttpPost]
+        [HttpPost("register")]
         public async Task<IActionResult> SignUp([FromBody] SignUpRequest request)
         {
             if (!ModelState.IsValid)
@@ -65,6 +67,74 @@ namespace CloudContactManager.Controllers
                 TenantId = tenant.Id,
                 Plan = freePlan.PlanName
             });
+        }
+        
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { Success = false, Message = "Invalid login payload." });
+            }
+
+            // Allow users to login using email (recommended) or company name as a simple username.
+            var tenant = await _context.Tenants
+                .FirstOrDefaultAsync(t => t.Email == request.Username || t.CompanyName == request.Username);
+
+            if (tenant is null)
+            {
+                return Unauthorized(new { Success = false, Message = "Invalid username or password." });
+            }
+
+            var verifyResult = _passwordHasher.VerifyHashedPassword(tenant, tenant.PasswordHash, request.Password);
+            if (verifyResult == PasswordVerificationResult.Failed)
+            {
+                return Unauthorized(new { Success = false, Message = "Invalid username or password." });
+            }
+
+            var token = GenerateJwtToken(tenant);
+
+            return Json(new
+            {
+                Success = true,
+                Message = "Login successful.",
+                Token = token
+            });
+        }
+
+        private string GenerateJwtToken(Tenant tenant)
+        {
+            // Read JWT configuration from appsettings.json using DI from HttpContext.
+            var configuration = HttpContext.RequestServices.GetService(typeof(IConfiguration)) as IConfiguration;
+            if (configuration is null)
+            {
+                throw new InvalidOperationException("IConfiguration is not available.");
+            }
+
+            var jwtSection = configuration.GetSection("Jwt");
+            var key = jwtSection["Key"] ?? throw new InvalidOperationException("Jwt:Key is missing.");
+            var issuer = jwtSection["Issuer"] ?? string.Empty;
+            var audience = jwtSection["Audience"] ?? string.Empty;
+            var expiresMinutes = int.TryParse(jwtSection["ExpiresMinutes"], out var mins) ? mins : 60;
+
+            var securityKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(key));
+            var credentials = new Microsoft.IdentityModel.Tokens.SigningCredentials(securityKey, Microsoft.IdentityModel.Tokens.SecurityAlgorithms.HmacSha256);
+
+            var claims = new List<System.Security.Claims.Claim>
+            {
+                new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, tenant.Id.ToString()),
+                new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, tenant.Email),
+                new System.Security.Claims.Claim("tenant_id", tenant.Id.ToString())
+            };
+
+            var token = new System.IdentityModel.Tokens.Jwt.JwtSecurityToken(
+                issuer: issuer,
+                audience: audience,
+                claims: claims,
+                expires: DateTime.UtcNow.AddMinutes(expiresMinutes),
+                signingCredentials: credentials);
+
+            return new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 }
