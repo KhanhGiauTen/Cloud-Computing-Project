@@ -1,6 +1,7 @@
 using Amazon.SimpleEmail;
 using Amazon.SimpleEmail.Model;
 using CloudContactManager.Services.Interfaces;
+using CloudContactManager.Services.API;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Headers;
@@ -63,43 +64,32 @@ namespace CloudContactManager.Services
             }
         }
 
-        // ================= SMS (SpeedSMS) =================
+        // ================= SMS (SpeedSMS via Speedsmsapi SDK) =================
         public async Task SendSmsAsync(string phoneNumber, string message)
         {
             var token = _configuration["SpeedSMS:AccessToken"];
-            var device = _configuration["SpeedSMS:Device"];
+            var sender = _configuration["SpeedSMS:Device"];
 
-            if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(device))
+            if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(sender))
             {
                 _logger.LogWarning("SpeedSMS configuration is missing. Skipping SMS send.");
                 return;
             }
 
-            var client = _httpClientFactory.CreateClient();
-
-            // Basic auth with token as username and ":x" as password per SpeedSMS docs
-            var authBytes = Encoding.ASCII.GetBytes($"{token}:x");
-            client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Basic", Convert.ToBase64String(authBytes));
-
-            var payload = new
+            try
             {
-                to = new[] { phoneNumber },
-                content = message,
-                sms_type = 5,
-                sender = device
-            };
+                var api = new Speedsmsapi(token);
+                var phones = new[] { phoneNumber };
+                var type = Speedsmsapi.TYPE_GATEWAY;
 
-            var json = System.Text.Json.JsonSerializer.Serialize(payload);
-            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+                // Run sync SDK call on a background thread to keep async signature.
+                var response = await Task.Run(() => api.sendSMS(phones, message, type, sender));
 
-            var response = await client.PostAsync("https://api.speedsms.vn/index.php/sms/send", content);
-
-            if (!response.IsSuccessStatusCode)
+                _logger.LogInformation("SpeedSMS send response: {Response}", response);
+            }
+            catch (Exception ex)
             {
-                var errorBody = await response.Content.ReadAsStringAsync();
-                _logger.LogError("SpeedSMS send failed. StatusCode={StatusCode}, Body={Body}",
-                    (int)response.StatusCode, errorBody);
+                _logger.LogError(ex, "SpeedSMS send failed.");
             }
         }
 
