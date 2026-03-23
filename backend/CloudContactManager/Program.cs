@@ -172,14 +172,17 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// Health check endpoint for ALB
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
-    app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+// HTTPS redirection is handled by the ALB, not the container
+// app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
