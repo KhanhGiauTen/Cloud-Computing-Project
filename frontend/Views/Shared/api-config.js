@@ -1,5 +1,12 @@
+const cloudContactStoredApiBaseUrl = localStorage.getItem('cloudContactApiBaseUrl');
+const cloudContactMetaApiBaseUrl = document.querySelector('meta[name="cloudcontact-api-base-url"]')?.content;
+const cloudContactDefaultApiBaseUrl =
+    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:5028'
+        : window.location.origin;
+
 window.CloudContactConfig = {
-    apiBaseUrl: (localStorage.getItem('cloudContactApiBaseUrl') || 'http://3.27.250.40').replace(/\/$/, ''),
+    apiBaseUrl: (cloudContactStoredApiBaseUrl || window.CLOUD_CONTACT_API_BASE_URL || cloudContactMetaApiBaseUrl || cloudContactDefaultApiBaseUrl).replace(/\/$/, ''),
     tokenStorageKey: 'cloudContactJwtToken',
     parseJwt(token) {
         try {

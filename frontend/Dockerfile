@@ -4,14 +4,12 @@ FROM nginx:alpine
 # Clean default nginx web root
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copy static assets
+# Copy static assets (css/js/lib/favicon)
 COPY wwwroot/ /usr/share/nginx/html/
 
-# Copy HTML pages exported from MVC Views
-COPY Views/ /usr/share/nginx/html/Views/
-
-# Set default landing page
-COPY Views/Home/Index.html /usr/share/nginx/html/index.html
+# Copy exported HTML pages to web root so routes like
+# /Home/Index.html, /Customers/Index.html work correctly
+COPY Views/ /usr/share/nginx/html/
 
 EXPOSE 80
 
