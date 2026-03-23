@@ -84,7 +84,7 @@
         window.CloudContactConfig.requireAuth('../Home/Login.html');
         window.CloudContactConfig.enableQuickLogout('../Home/Login.html');
 
-        const API_BASE = window.CloudContactConfig?.apiBaseUrl || 'http://3.27.250.40';
+        const API_BASE = window.CloudContactConfig.apiBaseUrl;
         const query = new URLSearchParams(window.location.search);
         const customerId = query.get('id');
         let createdAt = null;

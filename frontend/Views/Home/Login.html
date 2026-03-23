@@ -154,7 +154,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const TOKEN_KEY = 'cloudContactJwtToken';
-        const API_BASE = window.CloudContactConfig?.apiBaseUrl || 'http://3.27.250.40';
+        const API_BASE = window.CloudContactConfig.apiBaseUrl;
         window.CloudContactConfig.redirectIfAuthenticated('../Customers/Index.html');
 
         const messageBox = document.getElementById('messageBox');

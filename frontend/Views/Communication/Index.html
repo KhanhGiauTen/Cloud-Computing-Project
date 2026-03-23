@@ -92,7 +92,7 @@
         window.CloudContactConfig.requireAuth('../Home/Login.html');
         window.CloudContactConfig.enableQuickLogout('../Home/Login.html');
 
-        const API_BASE = window.CloudContactConfig?.apiBaseUrl || 'http://3.27.250.40';
+        const API_BASE = window.CloudContactConfig.apiBaseUrl;
 
         function showMessage(text, type) {
             const box = document.getElementById('messageBox');
