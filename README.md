@@ -15,12 +15,90 @@ A SaaS application for customer contact management built with ASP.NET Core 8.0 M
 ```
 .
 ├── backend/
-│   ├── CloudContactManager/            # ASP.NET Core backend/API project
-│   └── CloudContactManager.Tests/      # Unit test project
-├── frontend/                           # Frontend folder (separated)
+│   ├── .dockerignore
+│   ├── Dockerfile                              # Docker image for the ASP.NET Core app
+│   └── CloudContactManager/                   # Main ASP.NET Core 8.0 Web API project
+│   │   ├── CloudContactManager.csproj
+│   │   ├── CloudContactManager.sln
+│   │   ├── Program.cs                         # App entry point & DI/middleware setup
+│   │   ├── appsettings.json                   # App configuration (DB, AWS, JWT, etc.)
+│   │   ├── Controllers/
+│   │   │   ├── AuthController.cs              # Login, sign-up, JWT issuance
+│   │   │   ├── CommunicationController.cs     # Bulk SMS/Email communication
+│   │   │   ├── CustomersController.cs         # Customer CRUD endpoints
+│   │   │   └── HomeController.cs              # Home / error pages
+│   │   ├── Data/
+│   │   │   └── AppDbContext.cs                # EF Core DbContext
+│   │   ├── Migrations/                        # EF Core migration snapshots
+│   │   ├── Models/
+│   │   │   ├── Campaign.cs
+│   │   │   ├── CommunicationLog.cs
+│   │   │   ├── Customer.cs                    # Core customer entity
+│   │   │   ├── ErrorViewModel.cs
+│   │   │   ├── SubscriptionPlan.cs
+│   │   │   └── Tenant.cs                      # Multi-tenancy entity
+│   │   ├── Properties/
+│   │   │   └── launchSettings.json
+│   │   ├── Services/
+│   │   │   ├── Interfaces/
+│   │   │   │   ├── INotificationService.cs    # Notification service contract
+│   │   │   │   └── ITenantProvider.cs         # Tenant resolution contract
+│   │   │   ├── API/
+│   │   │   │   └── Speedsmsapi.cs             # SpeedSMS HTTP client helper
+│   │   │   ├── AwsNotificationService.cs      # AWS SES/SNS implementation
+│   │   │   ├── EmailNotificationService.cs    # SMTP email implementation
+│   │   │   ├── HttpContextTenantProvider.cs   # JWT-based tenant resolver
+│   │   │   ├── LocalNotificationService.cs    # Console-logging dev implementation
+│   │   │   ├── NotificationServices.cs        # Service dispatcher / factory
+│   │   │   └── SpeedSmsNotificationService.cs # SpeedSMS SMS implementation
+│   │   └── ViewModels/
+│   │       ├── CommunicationRequest.cs        # Bulk-send request DTO
+│   │       ├── LoginRequest.cs                # Login DTO
+│   │       └── SignUpRequest.cs               # Sign-up DTO
+│   └── CloudContactManager.Tests/             # xUnit unit-test project
+│       ├── CloudContactManager.Tests.csproj
+│       └── UnitTest1.cs
+├── frontend/
+│   ├── .dockerignore
+│   ├── Dockerfile                             # nginx image serving static HTML
+│   ├── README.md
+│   ├── index.html                             # Root redirect page
+│   ├── Views/
+│   │   ├── index.html                         # Views root redirect
+│   │   ├── Communication/
+│   │   │   └── Index.html                     # Bulk communication page
+│   │   ├── Customers/
+│   │   │   ├── Create.html                    # Add new customer form
+│   │   │   ├── Delete.html                    # Delete confirmation page
+│   │   │   ├── Edit.html                      # Edit customer form
+│   │   │   └── Index.html                     # Customer list page
+│   │   ├── Home/
+│   │   │   ├── Index.html                     # Dashboard / home page
+│   │   │   ├── Login.html                     # Login page
+│   │   │   ├── Privacy.html                   # Privacy policy page
+│   │   │   └── Signup.html                    # Registration page
+│   │   └── Shared/
+│   │       ├── Error.html                     # Error page
+│   │       ├── api-config.js                  # API base-URL configuration
+│   │       ├── sidebar-layout.css             # Sidebar layout styles
+│   │       └── site-static.css                # Global static styles
+│   └── wwwroot/
+│       ├── favicon.ico
+│       ├── css/
+│       │   └── site.css                       # Application-wide CSS
+│       ├── js/
+│       │   └── site.js                        # Application-wide JS
+│       └── lib/                               # Third-party client libraries
+│           ├── bootstrap/
+│           ├── jquery/
+│           ├── jquery-validation/
+│           └── jquery-validation-unobtrusive/
 ├── docs/
+│   ├── GITHUB_ISSUES.md                       # Pre-formatted GitHub issue templates
+│   └── postman/
+│       └── CloudContactManager.postman_collection.json  # Postman API collection
 ├── README.md
-└── RUNNING_LOCALLY.md
+└── RUNNING_LOCALLY.md                         # Local development guide
 ```
 
 ## Components
